@@ -1,0 +1,13 @@
+services:
+  imap-notifier-server:
+    restart: unless-stopped
+    container_name: imap-notifier-server
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - config_volume:/app/config
+    environment:
+      - TZ=Europe/Berlin
+volumes:
+  config_volume:
