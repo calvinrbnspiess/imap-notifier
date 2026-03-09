@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { RefreshCw, Wifi } from "lucide-react";
+import { RefreshCw, Wifi, Monitor } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -26,22 +26,52 @@ type PollLogEntry = {
   info: string;
 };
 
+type WsConnection = {
+  id: string;
+  ip: string;
+  hostname: string;
+  connectedAt: string;
+};
+
+function useTick(intervalMs = 1000) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setTick((n) => n + 1), intervalMs);
+    return () => clearInterval(t);
+  }, [intervalMs]);
+}
+
+function formatDuration(connectedAt: string): string {
+  const secs = Math.floor((Date.now() - new Date(connectedAt).getTime()) / 1000);
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  if (h > 0) return `${h}h ${m}m ${s}s`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
 export function Dashboard() {
   const [pollLogs, setPollLogs] = useState<PollLogEntry[]>([]);
   const [wsClientCount, setWsClientCount] = useState(0);
+  const [wsConnections, setWsConnections] = useState<WsConnection[]>([]);
   const [pollingEnabled, setPollingEnabled] = useState<boolean | null>(null);
   const [polling, setPolling] = useState(false);
   const [clearingHistory, setClearingHistory] = useState(false);
 
+  useTick(1000); // re-render every second to update durations
+
   const fetchData = useCallback(async () => {
     try {
-      const [logsRes, clientsRes, configRes] = await Promise.all([
+      const [logsRes, clientsRes, connectionsRes, configRes] = await Promise.all([
         fetch("/api/poll-logs"),
         fetch("/api/ws-clients"),
+        fetch("/api/ws-connections"),
         fetch("/api/config"),
       ]);
       if (logsRes.ok) setPollLogs(await logsRes.json());
       if (clientsRes.ok) setWsClientCount((await clientsRes.json()).count);
+      if (connectionsRes.ok) setWsConnections(await connectionsRes.json());
       if (configRes.ok) setPollingEnabled((await configRes.json()).pollingEnabled ?? true);
     } catch {
       // silently ignore auto-refresh errors
@@ -131,6 +161,48 @@ export function Dashboard() {
           </Button>
         </div>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Monitor className="h-4 w-4" />
+            Active Connections
+          </CardTitle>
+          <CardDescription>Notifier clients currently connected</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {wsConnections.length === 0 ? (
+            <div className="py-8 text-center text-slate-500 text-sm">
+              No clients connected.
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Hostname</TableHead>
+                  <TableHead>IP</TableHead>
+                  <TableHead>Connected since</TableHead>
+                  <TableHead>Duration</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {wsConnections.map((conn) => (
+                  <TableRow key={conn.id}>
+                    <TableCell className="font-medium">{conn.hostname}</TableCell>
+                    <TableCell className="text-slate-500 font-mono text-sm">{conn.ip}</TableCell>
+                    <TableCell className="text-xs text-slate-500 whitespace-nowrap">
+                      {formatTimestamp(conn.connectedAt)}
+                    </TableCell>
+                    <TableCell className="font-mono text-sm tabular-nums">
+                      {formatDuration(conn.connectedAt)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

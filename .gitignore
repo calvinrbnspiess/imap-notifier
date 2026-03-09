@@ -1,6 +1,14 @@
 .env
-dist
-node_modules
+dist/
+node_modules/
 config/config.json
-courses.json
-config/history.json
+
+# NeutralinoJS build artifacts
+client/dist/
+client/bin/
+client/.tmp/
+client/resources/js/neutralino.js
+
+# Local runtime config (contains wsUrl, not committed)
+notifier.config.json
+server/notifier.config.json

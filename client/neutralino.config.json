@@ -1,0 +1,48 @@
+{
+  "$schema": "https://raw.githubusercontent.com/neutralinojs/neutralinojs/main/schemas/neutralino.config.schema.json",
+  "applicationId": "com.calvinreibenspiess.imap-notifier",
+  "version": "1.0.0",
+  "defaultMode": "window",
+  "port": 0,
+  "url": "/",
+  "documentRoot": "/resources/",
+  "enableServer": true,
+  "enableNativeAPI": true,
+  "tokenSecurity": "one-time",
+  "logging": {
+    "enabled": false
+  },
+  "nativeAllowList": [
+    "app.*",
+    "window.*",
+    "events.*",
+    "os.execCommand",
+    "os.spawnProcess",
+    "os.updateSpawnedProcess",
+    "filesystem.readFile",
+    "filesystem.writeBinaryFile"
+  ],
+  "modes": {
+    "window": {
+      "title": "IMAP Notifier",
+      "width": 500,
+      "height": 210,
+      "hidden": true,
+      "centerScreen": true,
+      "resizable": false,
+      "alwaysOnTop": true,
+      "exitProcessOnClose": false,
+      "borderless": false,
+      "enableInspector": false
+    }
+  },
+  "cli": {
+    "binaryName": "ImapNotifier",
+    "resourcesPath": "/resources/",
+    "extensionsPath": "/extensions/",
+    "clientLibrary": "/resources/js/neutralino.js",
+    "builtinExtensions": false,
+    "binaryVersion": "6.5.0",
+    "clientVersion": "6.5.0"
+  }
+}

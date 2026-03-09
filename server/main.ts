@@ -5,7 +5,7 @@ import { join } from "path";
 import { config, ImapAccount, Rule } from "./helpers/config.js";
 import { initAuthentication } from "./authentication.js";
 import { clearHistory } from "./helpers/history.js";
-import { initWebSocketServer, getWsClientCount } from "./helpers/websocket.js";
+import { initWebSocketServer, getWsClientCount, getWsConnections } from "./helpers/websocket.js";
 import { getPollLogs } from "./helpers/pollLog.js";
 import { pollAllAccounts, previewRule } from "./helpers/imap.js";
 import dotenv from "dotenv";
@@ -82,6 +82,11 @@ function startCronJob(intervalSeconds: number, enabled: boolean): void {
   // GET /api/ws-clients — returns { count: number }
   app.get("/api/ws-clients", (req, res) => {
     res.json({ count: getWsClientCount() });
+  });
+
+  // GET /api/ws-connections — returns active connection details
+  app.get("/api/ws-connections", (req, res) => {
+    res.json(getWsConnections());
   });
 
   // GET /api/rules/:id/preview — preview which messages match a rule

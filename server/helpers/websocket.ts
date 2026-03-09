@@ -11,14 +11,50 @@ export type WsNotification = {
   message: string;
 };
 
+export type WsConnectionInfo = {
+  id: string;
+  ip: string;
+  hostname: string;
+  connectedAt: string; // ISO
+};
+
+const connections = new Map<WebSocket, WsConnectionInfo>();
+
 export function initWebSocketServer(httpServer: Server): WebSocketServer {
   wss = new WebSocketServer({ server: httpServer, path: "/ws" });
 
   wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
-    console.log(`WebSocket client connected from ${req.socket.remoteAddress}`);
+    const ip = req.socket.remoteAddress ?? "unknown";
+    const id = crypto.randomUUID();
+
+    connections.set(ws, {
+      id,
+      ip,
+      hostname: "unknown",
+      connectedAt: new Date().toISOString(),
+    });
+
+    console.log(`WebSocket client connected from ${ip}`);
+
+    ws.on("message", (data) => {
+      try {
+        const msg = JSON.parse(data.toString());
+        if (msg.type === "register") {
+          const info = connections.get(ws);
+          if (info) {
+            info.hostname = msg.hostname ?? "unknown";
+            console.log(`WebSocket client identified as ${info.hostname} (${ip})`);
+          }
+        }
+      } catch {
+        // ignore non-JSON messages
+      }
+    });
 
     ws.on("close", () => {
-      console.log("WebSocket client disconnected");
+      const info = connections.get(ws);
+      console.log(`WebSocket client disconnected: ${info?.hostname ?? "unknown"} (${ip})`);
+      connections.delete(ws);
     });
 
     ws.on("error", (err) => {
@@ -53,9 +89,15 @@ export function getWsClientCount(): number {
   if (!wss) return 0;
   let count = 0;
   wss.clients.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN) {
-      count++;
-    }
+    if (client.readyState === WebSocket.OPEN) count++;
   });
   return count;
+}
+
+export function getWsConnections(): WsConnectionInfo[] {
+  const result: WsConnectionInfo[] = [];
+  connections.forEach((info, ws) => {
+    if (ws.readyState === WebSocket.OPEN) result.push({ ...info });
+  });
+  return result;
 }

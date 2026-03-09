@@ -1,0 +1,85 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  height: 100%;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: #1a1a2e;
+  color: #eee;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 20px 0;
+  padding-bottom: 30px;
+  user-select: none;
+  overflow: hidden;
+}
+
+#app {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0 32px;
+  width: 100%;
+}
+
+#icon {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  color: #ff6b6b;
+}
+
+#icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+#content {
+  flex: 1;
+  min-width: 0;
+}
+
+#notif-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ff6b6b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 6px;
+}
+
+#notif-message {
+  font-size: 13px;
+  color: #ccc;
+  line-height: 1.4;
+}
+
+#ok-btn {
+  width: calc(100% - 64px);
+  padding: 10px;
+  background: #ff6b6b;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+  transition: background 0.15s;
+}
+
+#ok-btn:hover  { background: #ff4c4c; }
+#ok-btn:active { background: #e03030; }
