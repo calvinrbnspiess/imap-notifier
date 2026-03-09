@@ -1,45 +1,40 @@
-import { BankAccount } from "@/admin/components/Contacts";
 import Conf from "conf";
 import { join } from "path";
 
-export type Config = {
-  lexoffice: {
-    apiKey: string;
-    voucherStatus: string;
-    dateRange: {
-      startDate: string;
-      endDate: string;
-    };
-  };
-  accounts: BankAccount[];
-  creditor: {
-    iban: string;
-    bic: string;
-    identification: string;
-    name: string;
-    reqdColltnDate: string;
-  };
+export type ImapAccount = {
+  id: string;
+  name: string;
+  host: string;
+  port: number;
+  tls: boolean;
+  username: string;
+  password: string;
 };
 
-export const config = new Conf<Config>({
+export type Rule = {
+  id: string;
+  accountId: string; // account id or '*' for all
+  name: string;
+  subjectRegex?: string;
+  fromRegex?: string;
+  notificationTitle: string;
+  notificationMessage: string;
+  enabled: boolean;
+};
+
+export type AppConfig = {
+  accounts: ImapAccount[];
+  rules: Rule[];
+  pollInterval: number; // seconds
+};
+
+export const config = new Conf<AppConfig>({
   cwd: join(process.cwd(), "config"),
+  projectName: "imap-notifier",
   defaults: {
-    lexoffice: {
-      apiKey: "",
-      voucherStatus: "draft",
-      dateRange: {
-        startDate: "",
-        endDate: "",
-      },
-    },
     accounts: [],
-    creditor: {
-      iban: "",
-      bic: "",
-      identification: "",
-      name: "",
-      reqdColltnDate: "",
-    },
+    rules: [],
+    pollInterval: 60,
   },
   clearInvalidConfig: true,
 });

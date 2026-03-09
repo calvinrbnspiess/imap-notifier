@@ -4,6 +4,9 @@
 		"moduleDetection": "force",
 		// Ignore module structure
 		"module": "Preserve",
+		// Target ES2022+ to support private class fields (required by conf package)
+		"target": "ES2022",
+		"lib": ["ES2022", "DOM"],
 		// Allow JSON modules to be imported
 		"resolveJsonModule": true,
 		// Allow JS files to be imported from TS and vice versa
@@ -15,7 +18,8 @@
 		"jsx": "react-jsx",
 		"downlevelIteration": true,
 		"paths": {
-		"@/*": ["./server/*"]
+			"@/*": ["./server/admin/*"],
+			"server/*": ["./server/*"]
 		}
 	}
 }

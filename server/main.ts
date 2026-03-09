@@ -1,17 +1,43 @@
 import express from "express";
-import { createServer } from "vite";
+import { createServer as createViteServer } from "vite";
+import { createServer as createHttpServer } from "http";
 import { join } from "path";
-import { config } from "./helpers/config";
-import { initAuthentication, requireAuth } from "./authentication";
+import { config, ImapAccount, Rule } from "./helpers/config.js";
+import { initAuthentication } from "./authentication.js";
+import { initWebSocketServer, getWsClientCount } from "./helpers/websocket.js";
+import { getPollLogs } from "./helpers/pollLog.js";
+import { pollAllAccounts } from "./helpers/imap.js";
 import dotenv from "dotenv";
-import { Contact, Payment } from "./admin/components/Contacts";
-import { Invoice } from "./admin/components/Invoices";
-import { createSepaXMLDocument, generateMessageId } from "./helpers/sepa";
-import xmlFormat from "xml-formatter";
-import { formatIsoToDate, isValidDate } from "./helpers/utils";
-import { fetchWithCache } from "./helpers/fetch";
+import cron from "node-cron";
 
 dotenv.config();
+
+let cronTask: cron.ScheduledTask | null = null;
+
+function startCronJob(intervalSeconds: number): void {
+  if (cronTask) {
+    cronTask.stop();
+    cronTask = null;
+  }
+
+  // node-cron minimum is 1 second, convert seconds to cron expression
+  // For intervals >= 60, use minute-based cron; otherwise use second-based
+  let cronExpression: string;
+  if (intervalSeconds < 60) {
+    cronExpression = `*/${Math.max(1, intervalSeconds)} * * * * *`;
+  } else {
+    const minutes = Math.floor(intervalSeconds / 60);
+    cronExpression = `0 */${Math.max(1, minutes)} * * *`;
+  }
+
+  console.log(
+    `Starting IMAP poll cron: every ${intervalSeconds}s (expression: ${cronExpression})`
+  );
+
+  cronTask = cron.schedule(cronExpression, async () => {
+    await pollAllAccounts();
+  });
+}
 
 (async () => {
   if (
@@ -25,39 +51,154 @@ dotenv.config();
   }
 
   const port = 8000;
-
   const app = express();
+  const httpServer = createHttpServer(app);
 
   app.use(express.json());
 
   initAuthentication(app);
 
-  /* Get config */
-  app.get("/api/config", function (req, res) {
-    res.send(config.store);
+  // Initialize WebSocket server
+  initWebSocketServer(httpServer);
+
+  // ---- REST API ----
+
+  // GET /api/config — returns full config
+  app.get("/api/config", (req, res) => {
+    res.json(config.store);
   });
 
-  /* Update config */
-  app.post("/api/config", function (req, res) {
-    const parsedFields = req.body || {};
+  // GET /api/poll-logs — returns last 50 poll log entries
+  app.get("/api/poll-logs", (req, res) => {
+    res.json(getPollLogs());
+  });
 
-    try {
-      config.set(parsedFields);
-    } catch (error) {
-      console.error(error);
+  // GET /api/ws-clients — returns { count: number }
+  app.get("/api/ws-clients", (req, res) => {
+    res.json({ count: getWsClientCount() });
+  });
 
-      res.status(500).send("Could not update configuration");
+  // POST /api/poll — trigger manual poll
+  app.post("/api/poll", async (req, res) => {
+    pollAllAccounts().catch((err) =>
+      console.error("Manual poll error:", err)
+    );
+    res.json({ success: true, message: "Poll triggered" });
+  });
+
+  // POST /api/accounts — add account
+  app.post("/api/accounts", (req, res) => {
+    const body = req.body as Omit<ImapAccount, "id">;
+    const accounts = config.get("accounts");
+    const newAccount: ImapAccount = {
+      id: crypto.randomUUID(),
+      name: body.name ?? "",
+      host: body.host ?? "",
+      port: body.port ?? 993,
+      tls: body.tls ?? true,
+      username: body.username ?? "",
+      password: body.password ?? "",
+    };
+    accounts.push(newAccount);
+    config.set("accounts", accounts);
+    res.status(201).json(newAccount);
+  });
+
+  // PUT /api/accounts/:id — update account
+  app.put("/api/accounts/:id", (req, res) => {
+    const accounts = config.get("accounts");
+    const idx = accounts.findIndex((a) => a.id === req.params.id);
+    if (idx === -1) {
+      res.status(404).json({ error: "Account not found" });
+      return;
     }
-
-    res.status(200).send({ success: true, configuration: config.store });
+    const updated: ImapAccount = {
+      ...accounts[idx],
+      ...(req.body as Partial<ImapAccount>),
+      id: req.params.id,
+    };
+    accounts[idx] = updated;
+    config.set("accounts", accounts);
+    res.json(updated);
   });
-  // Client web:
+
+  // DELETE /api/accounts/:id — delete account
+  app.delete("/api/accounts/:id", (req, res) => {
+    const accounts = config.get("accounts");
+    const filtered = accounts.filter((a) => a.id !== req.params.id);
+    if (filtered.length === accounts.length) {
+      res.status(404).json({ error: "Account not found" });
+      return;
+    }
+    config.set("accounts", filtered);
+    res.json({ success: true });
+  });
+
+  // POST /api/rules — add rule
+  app.post("/api/rules", (req, res) => {
+    const body = req.body as Omit<Rule, "id">;
+    const rules = config.get("rules");
+    const newRule: Rule = {
+      id: crypto.randomUUID(),
+      accountId: body.accountId ?? "*",
+      name: body.name ?? "",
+      subjectRegex: body.subjectRegex,
+      fromRegex: body.fromRegex,
+      notificationTitle: body.notificationTitle ?? "",
+      notificationMessage: body.notificationMessage ?? "",
+      enabled: body.enabled ?? true,
+    };
+    rules.push(newRule);
+    config.set("rules", rules);
+    res.status(201).json(newRule);
+  });
+
+  // PUT /api/rules/:id — update rule
+  app.put("/api/rules/:id", (req, res) => {
+    const rules = config.get("rules");
+    const idx = rules.findIndex((r) => r.id === req.params.id);
+    if (idx === -1) {
+      res.status(404).json({ error: "Rule not found" });
+      return;
+    }
+    const updated: Rule = {
+      ...rules[idx],
+      ...(req.body as Partial<Rule>),
+      id: req.params.id,
+    };
+    rules[idx] = updated;
+    config.set("rules", rules);
+    res.json(updated);
+  });
+
+  // DELETE /api/rules/:id — delete rule
+  app.delete("/api/rules/:id", (req, res) => {
+    const rules = config.get("rules");
+    const filtered = rules.filter((r) => r.id !== req.params.id);
+    if (filtered.length === rules.length) {
+      res.status(404).json({ error: "Rule not found" });
+      return;
+    }
+    config.set("rules", filtered);
+    res.json({ success: true });
+  });
+
+  // PUT /api/settings — update pollInterval
+  app.put("/api/settings", (req, res) => {
+    const { pollInterval } = req.body as { pollInterval: number };
+    if (typeof pollInterval !== "number" || pollInterval < 1) {
+      res.status(400).json({ error: "pollInterval must be a positive number" });
+      return;
+    }
+    config.set("pollInterval", pollInterval);
+    startCronJob(pollInterval);
+    res.json({ success: true, pollInterval });
+  });
+
+  // ---- Static / Vite dev ----
   if (process.env.NODE_ENV === "development") {
-    // Serve client web through vite dev server:
-    const viteDevServer = await createServer({
-      server: {
-        middlewareMode: true,
-      },
+    const viteDevServer = await createViteServer({
+      server: { middlewareMode: true },
       configFile: join(process.cwd(), "vite.config.js"),
       root: join(process.cwd(), "server", "admin"),
       base: "/",
@@ -67,6 +208,12 @@ dotenv.config();
     app.use(express.static(join(process.cwd(), "dist")));
   }
 
-  app.listen(port);
-  console.log("Server started: http://localhost:" + port);
+  // Start polling cron
+  const pollInterval = config.get("pollInterval");
+  startCronJob(pollInterval);
+
+  httpServer.listen(port, () => {
+    console.log("Server started: http://localhost:" + port);
+    console.log("WebSocket server: ws://localhost:" + port + "/ws");
+  });
 })();

@@ -1,78 +1,86 @@
-import { useCallback, useState } from "react";
-import { Button } from "./components/Button";
-import { InputField } from "./components/InputField";
-import { Spinner } from "./components/Spinner";
-import { Card } from "./components/Card";
-import { toast } from "sonner";
+import { useState } from "react";
 import { sha256 } from "js-sha256";
+import { toast } from "sonner";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
-export const Login = () => {
-  const [isRunning, setRunning] = useState(false);
+export function Login() {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const performLogin = useCallback(
-    async (event) => {
-      console.log("Performing login ...");
-      setRunning(true);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
 
-      const form = event.target;
+    try {
+      const passwordHash = sha256(password);
 
-      const response = fetch("/login", {
+      const response = await fetch("/login", {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          username: form.elements.username.value,
-          password: sha256(form.elements.password.value),
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password: passwordHash }),
       });
 
-      response
-        .then((res) => res.json())
-        .then((response) => {
-          console.log("server returned", response);
-
-          setRunning(false);
-
-          if (!response.success) {
-            toast.error("Anmeldung konnte nicht durchgeführt werden.");
-            return;
-          }
-
-          window.location.reload();
-        });
-
-      event.preventDefault();
-    },
-    [setRunning]
-  );
+      if (response.ok) {
+        window.location.reload();
+      } else {
+        toast.error("Invalid credentials. Please try again.");
+      }
+    } catch {
+      toast.error("Connection error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="max-w-[800px] mx-auto p-5 py-[20vh]">
-      <h1 className="text-2xl font-bold mb-5 bg-gray-800 text-white py-2 px-4 inline-block my-8 select-none">
-        Lexoffice - SEPA-Generator
-      </h1>
-      <form onSubmit={performLogin}>
-        <Card title="Login">
-          <InputField
-            id="username"
-            label="Benutzername"
-            type="text"
-            autoComplete="username"
-            required
-          />
-          <InputField
-            id="password"
-            label="Kennwort"
-            type="password"
-            autoComplete="current-password"
-            required
-          />
-          <Button variant="secondary" disabled={isRunning}>
-            {isRunning ? <Spinner /> : "Login"}
-          </Button>
-        </Card>
-      </form>
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <Card className="w-full max-w-sm shadow-md">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl">imap-notifier</CardTitle>
+          <CardDescription>Sign in to the admin panel</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="username">Username</Label>
+              <Input
+                id="username"
+                type="text"
+                placeholder="Enter username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                autoComplete="username"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Enter password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                required
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Signing in..." : "Sign in"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
-};
+}
