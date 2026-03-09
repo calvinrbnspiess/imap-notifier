@@ -3,3 +3,4 @@ dist
 node_modules
 config/config.json
 courses.json
+config/history.json

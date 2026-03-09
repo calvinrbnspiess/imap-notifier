@@ -12,9 +12,11 @@ echo
 # Hash the password (SHA-256 then SHA-512 using OpenSSL)
 SHA256_HASH=$(echo -n "$PASSWORD" | openssl dgst -sha256 -hex | awk '{print $NF}')
 HASHED_PASSWORD=$(echo -n "$SHA256_HASH" | openssl dgst -sha512 -hex | awk '{print $NF}')
+SESSION_SECRET=$(openssl rand -hex 32)
 
 # Write to .env file
 echo "CONFIG_PANEL_USERNAME=$USERNAME" > .env
 echo "CONFIG_PANEL_PASSWORD=$HASHED_PASSWORD" >> .env
+echo "SESSION_SECRET=$(openssl rand -hex 32)" >> .env
 
 echo ".env file created successfully."
