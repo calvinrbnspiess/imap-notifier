@@ -4,9 +4,10 @@ import { createServer as createHttpServer } from "http";
 import { join } from "path";
 import { config, ImapAccount, Rule } from "./helpers/config.js";
 import { initAuthentication } from "./authentication.js";
+import { clearHistory } from "./helpers/history.js";
 import { initWebSocketServer, getWsClientCount } from "./helpers/websocket.js";
 import { getPollLogs } from "./helpers/pollLog.js";
-import { pollAllAccounts } from "./helpers/imap.js";
+import { pollAllAccounts, previewRule } from "./helpers/imap.js";
 import dotenv from "dotenv";
 import cron from "node-cron";
 
@@ -14,20 +15,25 @@ dotenv.config();
 
 let cronTask: cron.ScheduledTask | null = null;
 
-function startCronJob(intervalSeconds: number): void {
+function startCronJob(intervalSeconds: number, enabled: boolean): void {
   if (cronTask) {
     cronTask.stop();
     cronTask = null;
   }
 
-  // node-cron minimum is 1 second, convert seconds to cron expression
-  // For intervals >= 60, use minute-based cron; otherwise use second-based
+  if (!enabled) {
+    console.log("IMAP polling is disabled.");
+    return;
+  }
+
+  // node-cron 6-field: second minute hour dom month dow
+  // For sub-minute intervals use second field, otherwise minute field.
   let cronExpression: string;
   if (intervalSeconds < 60) {
     cronExpression = `*/${Math.max(1, intervalSeconds)} * * * * *`;
   } else {
     const minutes = Math.floor(intervalSeconds / 60);
-    cronExpression = `0 */${Math.max(1, minutes)} * * *`;
+    cronExpression = `0 */${Math.max(1, minutes)} * * * *`;
   }
 
   console.log(
@@ -76,6 +82,29 @@ function startCronJob(intervalSeconds: number): void {
   // GET /api/ws-clients — returns { count: number }
   app.get("/api/ws-clients", (req, res) => {
     res.json({ count: getWsClientCount() });
+  });
+
+  // GET /api/rules/:id/preview — preview which messages match a rule
+  app.get("/api/rules/:id/preview", async (req, res) => {
+    const rules = config.get("rules");
+    const rule = rules.find((r) => r.id === req.params.id);
+    if (!rule) {
+      res.status(404).json({ error: "Rule not found" });
+      return;
+    }
+    try {
+      const matches = await previewRule(rule);
+      res.json({ matches });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // DELETE /api/history — clear processed message history
+  app.delete("/api/history", (req, res) => {
+    clearHistory();
+    res.json({ success: true });
   });
 
   // POST /api/poll — trigger manual poll
@@ -142,8 +171,10 @@ function startCronJob(intervalSeconds: number): void {
       id: crypto.randomUUID(),
       accountId: body.accountId ?? "*",
       name: body.name ?? "",
-      subjectRegex: body.subjectRegex,
-      fromRegex: body.fromRegex,
+      subjectPattern: body.subjectPattern,
+      subjectMatchMode: body.subjectMatchMode,
+      fromPattern: body.fromPattern,
+      fromMatchMode: body.fromMatchMode,
       notificationTitle: body.notificationTitle ?? "",
       notificationMessage: body.notificationMessage ?? "",
       enabled: body.enabled ?? true,
@@ -162,8 +193,7 @@ function startCronJob(intervalSeconds: number): void {
       return;
     }
     const updated: Rule = {
-      ...rules[idx],
-      ...(req.body as Partial<Rule>),
+      ...(req.body as Rule),
       id: req.params.id,
     };
     rules[idx] = updated;
@@ -183,16 +213,24 @@ function startCronJob(intervalSeconds: number): void {
     res.json({ success: true });
   });
 
-  // PUT /api/settings — update pollInterval
+  // PUT /api/settings — update pollInterval and/or pollingEnabled
   app.put("/api/settings", (req, res) => {
-    const { pollInterval } = req.body as { pollInterval: number };
-    if (typeof pollInterval !== "number" || pollInterval < 1) {
-      res.status(400).json({ error: "pollInterval must be a positive number" });
-      return;
+    const body = req.body as { pollInterval?: number; pollingEnabled?: boolean };
+
+    if (body.pollInterval !== undefined) {
+      if (typeof body.pollInterval !== "number" || body.pollInterval < 1) {
+        res.status(400).json({ error: "pollInterval must be a positive number" });
+        return;
+      }
+      config.set("pollInterval", body.pollInterval);
     }
-    config.set("pollInterval", pollInterval);
-    startCronJob(pollInterval);
-    res.json({ success: true, pollInterval });
+
+    if (body.pollingEnabled !== undefined) {
+      config.set("pollingEnabled", body.pollingEnabled);
+    }
+
+    startCronJob(config.get("pollInterval"), config.get("pollingEnabled"));
+    res.json({ success: true, pollInterval: config.get("pollInterval"), pollingEnabled: config.get("pollingEnabled") });
   });
 
   // ---- Static / Vite dev ----
@@ -209,8 +247,7 @@ function startCronJob(intervalSeconds: number): void {
   }
 
   // Start polling cron
-  const pollInterval = config.get("pollInterval");
-  startCronJob(pollInterval);
+  startCronJob(config.get("pollInterval"), config.get("pollingEnabled"));
 
   httpServer.listen(port, () => {
     console.log("Server started: http://localhost:" + port);

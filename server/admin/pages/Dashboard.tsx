@@ -23,29 +23,26 @@ type PollLogEntry = {
   timestamp: string;
   account: string;
   status: "success" | "error" | "skipped";
-  matchCount: number;
   info: string;
 };
 
 export function Dashboard() {
   const [pollLogs, setPollLogs] = useState<PollLogEntry[]>([]);
   const [wsClientCount, setWsClientCount] = useState(0);
+  const [pollingEnabled, setPollingEnabled] = useState<boolean | null>(null);
   const [polling, setPolling] = useState(false);
+  const [clearingHistory, setClearingHistory] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
-      const [logsRes, clientsRes] = await Promise.all([
+      const [logsRes, clientsRes, configRes] = await Promise.all([
         fetch("/api/poll-logs"),
         fetch("/api/ws-clients"),
+        fetch("/api/config"),
       ]);
-      if (logsRes.ok) {
-        const logs = await logsRes.json();
-        setPollLogs(logs);
-      }
-      if (clientsRes.ok) {
-        const clients = await clientsRes.json();
-        setWsClientCount(clients.count);
-      }
+      if (logsRes.ok) setPollLogs(await logsRes.json());
+      if (clientsRes.ok) setWsClientCount((await clientsRes.json()).count);
+      if (configRes.ok) setPollingEnabled((await configRes.json()).pollingEnabled ?? true);
     } catch {
       // silently ignore auto-refresh errors
     }
@@ -56,6 +53,23 @@ export function Dashboard() {
     const interval = setInterval(fetchData, 10000);
     return () => clearInterval(interval);
   }, [fetchData]);
+
+  const clearHistory = async () => {
+    if (!confirm("Clear all processed message history? Messages will be re-evaluated on the next poll.")) return;
+    setClearingHistory(true);
+    try {
+      const res = await fetch("/api/history", { method: "DELETE" });
+      if (res.ok) {
+        toast.success("History cleared");
+      } else {
+        toast.error("Failed to clear history");
+      }
+    } catch {
+      toast.error("Connection error");
+    } finally {
+      setClearingHistory(false);
+    }
+  };
 
   const triggerPoll = async () => {
     setPolling(true);
@@ -97,11 +111,20 @@ export function Dashboard() {
             <Wifi className="h-3.5 w-3.5" />
             <span>{wsClientCount} WS client{wsClientCount !== 1 ? "s" : ""} connected</span>
           </div>
+          {pollingEnabled !== null && (
+            <div className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ${pollingEnabled ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-500"}`}>
+              <span className={`h-2 w-2 rounded-full ${pollingEnabled ? "bg-green-500" : "bg-slate-400"}`} />
+              {pollingEnabled ? "Polling active" : "Polling paused"}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={fetchData}>
             <RefreshCw className="h-4 w-4" />
             Refresh
+          </Button>
+          <Button variant="outline" size="sm" onClick={clearHistory} disabled={clearingHistory}>
+            {clearingHistory ? "Clearing..." : "Clear History"}
           </Button>
           <Button onClick={triggerPoll} disabled={polling} size="sm">
             {polling ? "Polling..." : "Trigger Poll"}
@@ -126,7 +149,6 @@ export function Dashboard() {
                   <TableHead>Timestamp</TableHead>
                   <TableHead>Account</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Matches</TableHead>
                   <TableHead>Info</TableHead>
                 </TableRow>
               </TableHeader>
@@ -138,7 +160,6 @@ export function Dashboard() {
                     </TableCell>
                     <TableCell className="font-medium">{log.account}</TableCell>
                     <TableCell>{statusBadge(log.status)}</TableCell>
-                    <TableCell className="text-center">{log.matchCount}</TableCell>
                     <TableCell className="text-sm text-slate-600 max-w-xs truncate">
                       {log.info}
                     </TableCell>

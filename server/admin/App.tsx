@@ -9,7 +9,7 @@ export function App() {
     <div className="min-h-screen bg-slate-50">
       <header className="border-b border-slate-200 bg-white">
         <div className="max-w-6xl mx-auto px-6 py-4">
-          <h1 className="text-xl font-bold text-slate-900">imap-notifier</h1>
+          <h1 className="text-xl font-bold text-slate-900">IMAP Notifier</h1>
         </div>
       </header>
 

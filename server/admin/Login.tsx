@@ -46,7 +46,7 @@ export function Login() {
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
       <Card className="w-full max-w-sm shadow-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">imap-notifier</CardTitle>
+          <CardTitle className="text-2xl">IMAP NOTIFIER</CardTitle>
           <CardDescription>Sign in to the admin panel</CardDescription>
         </CardHeader>
         <CardContent>

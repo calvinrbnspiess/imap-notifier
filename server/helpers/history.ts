@@ -37,6 +37,10 @@ export function isMessageProcessed(accountId: string, uid: string | number): boo
   return history.processedMessages.includes(key);
 }
 
+export function clearHistory(): void {
+  writeHistory({ processedMessages: [] });
+}
+
 export function markMessageProcessed(accountId: string, uid: string | number): void {
   const history = readHistory();
   const key = `${accountId}:${uid}`;

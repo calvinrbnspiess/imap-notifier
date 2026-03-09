@@ -2,7 +2,6 @@ export type PollLogEntry = {
   timestamp: string;
   account: string;
   status: "success" | "error" | "skipped";
-  matchCount: number;
   info: string;
 };
 
