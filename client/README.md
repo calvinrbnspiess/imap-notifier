@@ -41,12 +41,21 @@ The script will:
 1. Install the `neu` CLI (`npm install -g @neutralinojs/neu`)
 2. Download NeutralinoJS binaries (`neu update`)
 3. Build a single self-contained `.exe` (`neu build --embed-resources`)
-4. Create a self-signed code signing certificate for `calvinreibenspiess@gmail.com` (if none exists)
-5. Sign the `.exe` with `signtool.exe`
+4. Patch version info and icon with `rcedit`
 
-Output: `dist\notifier-win_x64.exe`
+Output: `dist\ImapNotifier-win_x64.exe`
 
-> **Signing requirement:** `signtool.exe` comes with the Windows SDK.
+### Signing (optional, separate step)
+
+```powershell
+powershell -ExecutionPolicy Bypass -File sign.ps1
+```
+
+The script will:
+1. Look up (or create) a self-signed code signing certificate for `calvinreibenspiess@gmail.com`
+2. Sign `dist\ImapNotifier-win_x64.exe` with `signtool.exe`
+
+> **Requirement:** `signtool.exe` comes with the Windows SDK.
 > Install via: `winget install Microsoft.WindowsSDK.10.0.22621`
 
 ---

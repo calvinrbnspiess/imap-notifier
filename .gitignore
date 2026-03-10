@@ -8,6 +8,7 @@ client/dist/
 client/bin/
 client/.tmp/
 client/resources/js/neutralino.js
+client/tools/
 
 # Local runtime config (contains wsUrl, not committed)
 notifier.config.json

@@ -1,4 +1,4 @@
-# IMAP Notifier – Build + Sign
+# IMAP Notifier - Build + Sign
 # Run from the client\ directory on a Windows machine.
 # Requirements: Node.js (for neu CLI), Windows SDK (for signtool).
 
@@ -19,7 +19,7 @@ neu update
 Write-Host "Building notifier.exe ..."
 neu build --release --embed-resources
 
-$exe = Get-ChildItem ".\dist\ImapNotifier-win_x64.exe" -ErrorAction SilentlyContinue |
+$exe = Get-ChildItem ".\dist" -Recurse -Filter "ImapNotifier*.exe" -ErrorAction SilentlyContinue |
        Select-Object -First 1 -ExpandProperty FullName
 
 if (-not $exe) {
@@ -38,7 +38,7 @@ if (-not (Get-Command rcedit -ErrorAction SilentlyContinue)) {
 Write-Host "Patching version info ..."
 $rceditArgs = @(
     $exe,
-    '--set-version-string', 'FileDescription',  'IMAP Notifier',
+    '--set-version-string', 'FileDescription',  'IMAP Notifier - Erzeuge Desktop-Benachrichtigungen bei E-Mail-Eingang',
     '--set-version-string', 'ProductName',       'IMAP Notifier',
     '--set-version-string', 'CompanyName',       'Calvin Reibenspiess',
     '--set-version-string', 'InternalName',      'ImapNotifier',
