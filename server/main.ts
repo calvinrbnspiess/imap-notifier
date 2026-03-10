@@ -56,7 +56,7 @@ function startCronJob(intervalSeconds: number, enabled: boolean): void {
     process.exit(0);
   }
 
-  const port = 8000;
+  const port = 7140;
   const app = express();
   const httpServer = createHttpServer(app);
 

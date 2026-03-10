@@ -11,7 +11,7 @@ Built with [NeutralinoJS](https://neutralino.js.org) — output is a **single si
 Create `notifier.config.json` next to the `.exe`:
 
 ```json
-{ "wsUrl": "ws://YOUR_SERVER_IP:8000/ws" }
+{ "wsUrl": "ws://YOUR_SERVER_IP:7140/ws" }
 ```
 
 The alarm sound is `resources/alarm.mp3` — replace it with any `.mp3` file before building.
