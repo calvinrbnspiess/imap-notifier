@@ -2,6 +2,8 @@ services:
   imap-notifier-server:
     restart: unless-stopped
     container_name: imap-notifier-server
+    ports:
+      - 7140:7140
     build:
       context: .
       dockerfile: Dockerfile
